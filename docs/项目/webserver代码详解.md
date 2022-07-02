@@ -105,7 +105,7 @@ RAII的核心思想是**将资源或者状态与对象的生命周期绑定**，
 - 当服务器进入正式运行阶段，开始处理客户请求的时候，如果它需要相关的资源，可以直接从池中获取，无需动态分配；
 - 当服务器处理完一个客户连接后，可以把相关的资源放回池中，无需执行系统调用释放资源。
 
-![img](https://pic4.zhimg.com/80/v2-ab874df7219895195def55a02fb390f7_720w.jpg)
+<img src="https://gcore.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202207021718823.png" alt="image-20220702171826767" style="zoom:80%;" />
 
 [最新版Web服务器项目详解 - 03 半同步半反应堆线程池（下） (qq.com)](https://mp.weixin.qq.com/s/PB8vMwi8sB4Jw3WzAKpWOQ)
 
@@ -362,7 +362,7 @@ HTTP的处理流程分为以下三个步骤：
 
 在连接阶段，最重要的是**tcp连接过程和读取http的请求报文**（其实读取请求报文就是读取客户端发送的数据而已），tcp连接过程涉及epoll内核事件创建等。
 
-<img src="https://gcore.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202204072021336.png" alt="image-20220407202158284" style="zoom:80%;" />
+<img src="https://test1.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202204072021336.png" alt="image-20220407202158284" style="zoom:80%;" />
 
 服务器是如何实现读取http的报文的呢？首先，服务器需要对每一个**已建立连接http建立一个http的类对象**，这部分代码如下（服务器一直在运行`eventloop`即回环事件，因为整个服务器s其实是事件驱动）：
 
@@ -546,7 +546,7 @@ void WebServer::dealwithwrite(int sockfd)
 
 **从状态机负责读取报文的一行，主状态机负责对该行数据进行解析**，主状态机内部调用从状态机，从状态机驱动主状态机。
 
-![image-20220403105959011](https://gcore.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202204031059253.png)
+![image-20220403105959011](https://test1.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202204031059253.png)
 
 **主状态机**
 
@@ -1520,7 +1520,7 @@ bool http_conn::write()
 
 利用`alarm`函数周期性地触发`SIGALRM`信号，信号处理函数利用**管道**通知主循环，主循环接收到该信号后对升序链表上所有定时器进行处理，若该段时间内没有交换数据，则将该连接关闭，释放所占用的资源。
 
-![](https://pic3.zhimg.com/80/v2-50f8a9c898447e79c04810883e7ed332_720w.jpg)
+<img src="https://gcore.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202207021719437.png" alt="image-20220702171952348" style="zoom:80%;" />
 
 定时器处理非活动连接模块，主要分为两部分：其一为定时方法与信号通知流程，其二为定时器及其容器设计与定时任务的处理。
 
@@ -2049,7 +2049,7 @@ void sort_timer_lst::tick()
 
 服务器首先创建定时器容器链表，然后用统一事件源将异常事件、读写事件和信号事件统一处理，根据不同事件的对应逻辑使用定时器。
 
-![](https://pic3.zhimg.com/80/v2-50f8a9c898447e79c04810883e7ed332_720w.jpg)
+<img src="https://gcore.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202207021721326.png" alt="image-20220702172100255" style="zoom:80%;" />
 
 具体的逻辑如下：
 
@@ -2950,8 +2950,7 @@ int fflush(FILE *stream);
   - 判断是否分文件
   - 格式化输出内容，将内容写入阻塞队列，创建一个写线程，从阻塞队列取出内容写入日志文件
 
-
-![640](https://gcore.jsdelivr.net/gh//img/202204072013940.jpg)
+![](https://gcore.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202204072013940.jpg)
 
 通过**局部变量的懒汉单例模式**创建日志实例，对其进行初始化生成日志文件后，格式化输出内容，并根据不同的写入方式，完成对应逻辑，写入日志文件。
 

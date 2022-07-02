@@ -4,6 +4,8 @@
 
 [qinguoyi/TinyWebServer: Linux下C++轻量级Web服务器 (github.com)](https://github.com/qinguoyi/TinyWebServer)
 
+[white0dew/WebServer: A TinyWebServer implemented inC++11. (github.com)（注释版）](https://github.com/white0dew/WebServer)
+
 [markparticle/WebServer: C++ Linux WebServer服务器 (github.com)(牛客讲解)](https://github.com/markparticle/WebServer)
 
 ---
@@ -37,6 +39,8 @@
 [Tinywebserver-一个简易的web服务器_aiwuzhi12的博客-CSDN博客](https://blog.csdn.net/aiwuzhi12/article/details/60767763)
 
 [小白视角：一文读懂社长的TinyWebServer](https://huixxi.github.io/2020/06/02/%E5%B0%8F%E7%99%BD%E8%A7%86%E8%A7%92%EF%BC%9A%E4%B8%80%E6%96%87%E8%AF%BB%E6%87%82%E7%A4%BE%E9%95%BF%E7%9A%84TinyWebServer/#more)
+
+[#Web服务器-原始版本 (qq.com)](https://mp.weixin.qq.com/mp/appmsgalbum?action=getalbum&__biz=MzAxNzU2MzcwMw==&scene=1&album_id=1339230165934882817&count=3#wechat_redirect)
 
 [最新版Web服务器项目详解 - 01 线程同步机制封装类](https://mp.weixin.qq.com/s?__biz=MzAxNzU2MzcwMw==&mid=2649274278&idx=3&sn=5840ff698e3f963c7855d702e842ec47&chksm=83ffbefeb48837e86fed9754986bca6db364a6fe2e2923549a378e8e5dec6e3cf732cdb198e2&scene=0&xtrack=1#rd)
 
