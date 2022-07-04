@@ -132,8 +132,8 @@ public:
     threadpool(int actor_model, connection_pool *connPool, 
                int thread_number = 8, int max_request = 10000);
     ~threadpool();
-    bool append(T *request, int state);
-    bool append_p(T *request);
+    bool append(T *request, int state); //reactor模式下的请求入队
+    bool append_p(T *request);          //proactor模式下的请求入队
 
 private:
     /*工作线程运行的函数，它不断从工作队列中取出任务并执行*/
@@ -233,7 +233,7 @@ bool threadpool<T>::append(T *request, int state)
         return false;
     }
     //读写事件
-    request->m_state = state;
+    request->m_state = state; //IO 事件类别:读为0, 写为1
     m_workqueue.push_back(request);
     m_queuelocker.unlock();
     m_queuestat.post();
@@ -346,8 +346,6 @@ void threadpool<T>::run()
 }
 ```
 
-
-
 # 二、HTTP处理流程
 
 HTTP的处理流程分为以下三个步骤：
@@ -364,7 +362,7 @@ HTTP的处理流程分为以下三个步骤：
 
 <img src="https://test1.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202204072021336.png" alt="image-20220407202158284" style="zoom:80%;" />
 
-服务器是如何实现读取http的报文的呢？首先，服务器需要对每一个**已建立连接http建立一个http的类对象**，这部分代码如下（服务器一直在运行`eventloop`即回环事件，因为整个服务器s其实是事件驱动）：
+服务器是如何实现读取http的报文的呢？首先，服务器需要对每一个**已建立连接http建立一个http的类对象**，这部分代码如下（服务器一直在运行`eventloop`即回环事件，因为整个服务器其实是事件驱动的）：
 
 ```php
 //事件回环（即服务器主线程）
@@ -538,8 +536,6 @@ void WebServer::dealwithwrite(int sockfd)
 }
 ```
 
-
-
 ## 2、处理报文请求
 
 [最新版Web服务器项目详解 - 05 http连接处理（中）](https://mp.weixin.qq.com/s/wAQHU-QZiRt1VACMZZjNlw)
@@ -637,7 +633,7 @@ void http_conn::process()
  //m_start_line是已经解析的字符
  //get_line用于将指针向后偏移，指向未处理的字符
  char* get_line(){
-     return m_read_buf+m_start_line;
+     return m_read_buf + m_start_line;
  }
 
 //有限状态机处理请求报文
@@ -726,7 +722,7 @@ http_conn::HTTP_CODE http_conn::process_read()
 
 ```php
 //从状态机，用于分析出一行内容
-//返回值为行的读取状态，有LINE_OK,LINE_BAD,LINE_OPEN
+//返回值为行的读取状态，有LINE_OK, LINE_BAD, LINE_OPEN
 
 //m_read_idx指向缓冲区m_read_buf的数据末尾的下一个字节
 //m_checked_idx指向从状态机当前正在分析的字节
@@ -792,8 +788,8 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char *text)
     //要访问的资源以及所使用的HTTP版本，其中各个部分之间通过\t或空格分隔。
     //请求行中最先含有空格和\t任一字符的位置并返回
 
-    //strpbrk(string pointer break)：在源字符串（s1）中找出最先含有搜索字符串（s2）
-    //中任一字符的位置并返回，若找不到则返回空指针
+    //strpbrk(string pointer break)：在源字符串（s1）中找出最先含有
+    //搜索字符串（s2）中任一字符的位置并返回，若找不到则返回空指针
     m_url = strpbrk(text, " \t");
     //如果没有空格或\t，则报文格式有误
     if (!m_url)
@@ -819,7 +815,7 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char *text)
     //m_url此时跳过了第一个空格或\t字符，但不知道之后是否还有
     //将m_url向后偏移，通过查找，继续跳过空格和\t字符，指向请求资源的第一个字符
     //strspn(const char *str, const char * accept)：计算字符串 str 中连续有几个字符都属于字符串 accept
-    //其返回值是字符串str开头连续包含字符串accept内的字符数目
+    //其返回值是字符串str开头连续包含字符串accept内的字符数目 (str s)
     m_url += strspn(m_url, " \t");
 
     //相同逻辑，判断HTTP版本号
@@ -862,18 +858,17 @@ http_conn::HTTP_CODE http_conn::parse_request_line(char *text)
 ```
 
 - **CHECK_STATE_HEADER**
-
-  - 调用parse_headers函数解析请求头部信息
-
-  - 判断是空行还是请求头，这里通过判断当前的text首位是不是\0字符。若是，则表示当前处理的是空行；若不是，则表示当前处理的是请求头。
-
-    - 若是空行，进而判断content-length是否为0：如果不是0，表明是POST请求，则状态转移到CHECK_STATE_CONTENT；否则说明是GET请求，则报文解析结束。
-
-    - 若解析的是请求头部字段，则主要分析connection字段，content-length字段，其他字段可以直接跳过，各位也可以根据需求继续分析。
-
-  - connection字段判断是keep-alive还是close，决定是长连接还是短连接
-
-  - content-length字段，这里用于读取post请求的消息体长度
+- 调用parse_headers函数解析请求头部信息
+  
+- 判断是空行还是请求头，这里通过判断当前的text首位是不是\0字符。若是，则表示当前处理的是空行；若不是，则表示当前处理的是请求头。
+  
+  - 若是空行，进而判断content-length是否为0：如果不是0，表明是POST请求，则状态转移到CHECK_STATE_CONTENT；否则说明是GET请求，则报文解析结束。
+  
+  - 若解析的是请求头部字段，则主要分析connection字段，content-length字段，其他字段可以直接跳过，各位也可以根据需求继续分析。
+  
+- connection字段判断是keep-alive还是close，决定是长连接还是短连接
+  
+- content-length字段，这里用于读取post请求的消息体长度
 
 
 ```php

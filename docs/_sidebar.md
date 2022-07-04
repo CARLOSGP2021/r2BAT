@@ -18,7 +18,7 @@
     - [MySQL](八股文/MySQL.md)
 - 🥳**项目**
     - [服务器](项目/webserver项目.md)
-    - [代码详解](项目/webserver代码详解.md)
+    - [详解](项目/webserver代码详解.md)
 - 🤖**Linux**
     - [Linux](Linux/Linux.md)
     - [Vim](Linux/Vim.md)
