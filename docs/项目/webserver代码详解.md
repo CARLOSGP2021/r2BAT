@@ -980,13 +980,81 @@ http_conn::HTTP_CODE http_conn::parse_content(char *text)
 
 在process_read()中完成请求报文的解析之后，状态机会调用do_request()函数，该函数是处理功能逻辑的，将网站根目录和url文件拼接，然后通过stat判断该文件属性。url可以抽象成 ip:port/xxx，xxx通过html文件的action属性（即请求报文）进行设置。m_url为请求报文中解析出的请求资源，以/开头，也就是x，项目中解析后的m_url有8种情况，见do_request()函数。
 
-其中，**stat函数用于获取文件的类型、大小等信息**；mmap用于将文件等映射到内存，提高访问速度，详见[mmap原理](https://link.zhihu.com/?target=https%3A//blog.csdn.net/bbzhaohui/article/details/81665370)；iovec定义向量元素，通常，这个结构用作一个多元素的数组，详见[社长微信](https://link.zhihu.com/?target=https%3A//mp.weixin.qq.com/s/451xNaSFHxcxfKlPBV3OCg)；writev为聚集写，详见[链接](https://link.zhihu.com/?target=https%3A//www.cnblogs.com/fanweisheng/p/11138704.html)；
+其中，**stat函数用于获取文件的类型、大小等信息**；mmap用于将文件等映射到内存，提高访问速度，详见[mmap原理](https://link.zhihu.com/?target=https%3A//blog.csdn.net/bbzhaohui/article/details/81665370)；iovec定义向量元素，通常这个结构用作一个多元素的数组，详见[社长微信](https://link.zhihu.com/?target=https%3A//mp.weixin.qq.com/s/451xNaSFHxcxfKlPBV3OCg)；writev为聚集写，详见[链接](https://link.zhihu.com/?target=https%3A//www.cnblogs.com/fanweisheng/p/11138704.html)；
 
 执行do_request()函数之后，子线程调用process_write()进行响应报文（add_status_line、add_headers等函数）的生成。在生成响应报文的过程中主要调用add_reponse()函数更新m_write_idx和m_write_buf。
 
 值得注意的是，响应报文分为两种，一种是**请求文件的存在**，通过io向量机制iovec，声明两个iovec，第一个指向m_write_buf，第二个指向mmap的地址m_file_address；另一种是**请求出错**，这时候只申请一个iovec，指向m_write_buf 。
 
 其实往响应报文里写的就是服务器中html的文件数据，浏览器端对其进行解析、渲染并显示在浏览器页面上。另外，用户登录注册的验证逻辑代码在do_request()中，通过对Mysql数据库进行查询或插入，验证、添加用户。
+
+```php
+#include <sys/mman.h>
+void *mmap(void *addr, size_t length, int prot, int flags,int fd, off_t offset);
+    - 功能：将一个文件或者设备的数据映射到内存中
+    - 参数：
+        - void *addr: NULL, 由内核指定
+        - length : 要映射的数据的长度，这个值不能为0。建议使用文件的长度。
+                获取文件的长度：stat lseek
+        - prot : 对申请的内存映射区的操作权限
+            -PROT_EXEC ：可执行的权限
+            -PROT_READ ：读权限
+            -PROT_WRITE ：写权限
+            -PROT_NONE ：没有权限
+            要操作映射内存，必须要有读的权限。
+            PROT_READ、PROT_READ|PROT_WRITE
+        - flags :
+            - MAP_SHARED : 映射区的数据会自动和磁盘文件进行同步，进程间通信，必须要设置这个选项
+            - MAP_PRIVATE ：不同步，内存映射区的数据改变了，对原来的文件不会修改，会重新创建一个新的文件。（copy on write）
+        - fd: 需要映射的那个文件的文件描述符
+            - 通过open得到，open的是一个磁盘文件
+            - 注意：文件的大小不能为0，open指定的权限不能和prot参数有冲突。
+                prot: PROT_READ                open:只读/读写 
+                prot: PROT_READ | PROT_WRITE   open:读写
+        - offset：偏移量，一般不用。必须指定的是4k的整数倍，0表示不偏移。
+    - 返回值：
+        成功返回创建的内存的首地址
+        失败返回MAP_FAILED，(void *) -1
+
+int munmap(void *addr, size_t length);
+    - 功能：释放内存映射
+    - 参数：
+        - addr : 要释放的内存的首地址
+        - length : 要释放的内存的大小，要和mmap函数中的length参数的值一样。
+```
+
+**iovec**
+
+定义一个向量元素，通常这个结构用作一个多元素的数组。
+
+```php
+struct iovec {
+    void      *iov_base;      /* starting address of buffer */
+    size_t    iov_len;        /* size of buffer */
+};
+```
+
+- iov_base指向数据的地址
+- iov_len表示数据的长度
+
+**writev**
+
+writev函数用于在一次函数调用中写多个非连续缓冲区，又称为聚集写。
+
+```php
+#include <sys/uio.h>
+ssize_t writev(int filedes, const struct iovec *iov, int iovcnt);
+```
+
+- filedes表示文件描述符
+- iov为前述io向量机制结构体iovec
+- iovcnt为结构体的个数
+
+若成功则返回已写的字节数，若出错则返回-1。
+
+`writev`以顺序`iov[0]`，`iov[1]`至`iov[iovcnt-1]`从缓冲区中聚集输出数据。`writev`返回输出的字节总数，通常它应等于所有缓冲区长度之和。
+
+**特别注意：** 循环调用writev时，需要重新处理iovec中的指针和长度，该函数不会对这两个成员做任何处理。writev的返回值为已写的字节数，但这个返回值“实用性”并不高，因为参数传入的是iovec数组，计量单位是iovcnt，而不是字节数，我们仍然需要通过遍历iovec来计算新的基址，另外写入数据的“结束点”可能位于一个iovec的中间某个位置，因此需要调整临界iovec的io_base和io_len。
 
 **HTTP_CODE含义**
 
@@ -1080,7 +1148,7 @@ m_url为请求报文中解析出的请求资源，以/开头，也就是`/xxx`�
 
 ```php
 //网站根目录，文件夹内存放请求的资源和跳转的html文件
-const char* doc_root="/home/qgy/github/ini_tinywebserver/root";
+const char* doc_root = "/home/qgy/github/ini_tinywebserver/root";
 
 //功能逻辑单元
 http_conn::HTTP_CODE http_conn::do_request()
@@ -1090,7 +1158,7 @@ http_conn::HTTP_CODE http_conn::do_request()
     int len = strlen(doc_root);
     
     //找到m_url中/的位置
-    //strrchr() 函数查找字符串在另一个字符串中最后一次出现的位置,并返回从该位置到字符串结尾的所有字符
+    //strrchr() 函数查找字符串在另一个字符串中最后一次出现的位置，并返回从该位置到字符串结尾的所有字符
     const char *p = strrchr(m_url, '/');
 
     //实现登录和注册校验
@@ -1099,10 +1167,10 @@ http_conn::HTTP_CODE http_conn::do_request()
 
         //根据标志判断是登录检测还是注册检测
         char flag = m_url[1];
-
+        
         char *m_url_real = (char *)malloc(sizeof(char) * 200);
         strcpy(m_url_real, "/");
-        strcat(m_url_real, m_url + 2);
+        strcat(m_url_real, m_url + 2); //将两个char类型连接
         strncpy(m_real_file + len, m_url_real, FILENAME_LEN - len - 1);
         free(m_url_real);
 
@@ -1231,6 +1299,23 @@ http_conn::HTTP_CODE http_conn::do_request()
 
 ### **process_write**
 
+**响应报文**
+
+HTTP响应由四个部分组成，分别是：状态行、消息报头、空行和响应正文。
+
+```php
+HTTP/1.1 200 OK
+Date: Fri, 22 May 2009 06:07:21 GMT
+Content-Type: text/html; charset=UTF-8
+空行
+<html>
+      <head></head>
+      <body>
+            <!--body goes here-->
+      </body>
+</html>
+```
+
 根据`do_request`的返回状态，服务器子线程调用`process_write`向`m_write_buf`中写入响应报文。
 
 - add_status_line函数，添加状态行：http/1.1 状态码 状态消息
@@ -1256,7 +1341,7 @@ bool http_conn::add_response(const char *format, ...)
     va_list arg_list;
     //将变量arg_list初始化为传入参数
     va_start(arg_list, format);
-    //将数据format从可变参数列表写入x缓冲区，返回写入数据的长度
+    //将数据format从可变参数列表写入写缓冲区，返回写入数据的长度
     int len = vsnprintf(m_write_buf + m_write_idx, WRITE_BUFFER_SIZE - 1 - m_write_idx, format, arg_list);
     //如果写入的数据长度超过缓冲区剩余空间，则报错
     if (len >= (WRITE_BUFFER_SIZE - 1 - m_write_idx))
@@ -1476,7 +1561,7 @@ bool http_conn::write()
             //浏览器的请求为长连接
             if (m_linger)
             {
-                //重新初始化HTTP对象**
+                //重新初始化HTTP对象*
                 init();
                 return true;
             }
@@ -1499,11 +1584,11 @@ bool http_conn::write()
 
 **定时事件**是指固定一段时间之后触发某段代码，由该段代码处理一个事件，如从内核事件表删除事件，并关闭文件描述符，释放连接资源。
 
-**定时器**是指利用结构体或其他形式，将多种定时事件进行封装起来。具体的，这里只涉及一种定时事件，即**定期检测非活跃连接**，这里将该定时事件与连接资源封装为一个结构体定时器。
+**定时器**是指利用结构体或其他形式，将多种定时事件进行封装起来。这里只涉及一种定时事件，即**定期检测非活跃连接**，这里将该定时事件与连接资源封装为一个结构体定时器。
 
-**定时器容器**是指使用某种容器类数据结构，将上述多个定时器组合起来，便于对定时事件统一管理。具体的，项目中使用**升序链表**将所有定时器串联组织起来。
+**定时器容器**是指使用某种容器类数据结构，将上述多个定时器组合起来，便于对定时事件统一管理。项目中使用**升序链表**将所有定时器串联组织起来。
 
-本项目中，服务器主循环为每一个连接创建一个定时器，并对每个连接进行定时。另外，利用升序时间链表容器将所有定时器串联起来，若主循环接收到定时通知，则在链表中依次执行定时任务。
+本项目中，服务器主循环为每一个连接创建一个定时器，并对每个连接进行定时。另外，利用**升序时间链表容器**将所有定时器串联起来，若主循环接收到定时通知，则在链表中依次执行定时任务。
 
 `Linux`下提供了三种定时的方法:
 
@@ -1511,7 +1596,7 @@ bool http_conn::write()
 - SIGALRM信号
 - I/O复用系统调用的超时参数
 
-三种方法没有一劳永逸的应用场景，也没有绝对的优劣。由于项目中使用的是`SIGALRM`信号，这里仅对其进行介绍，另外两种方法可以查阅游双的`Linux高性能服务器编程 第11章 定时器`。
+三种方法没有一劳永逸的应用场景，也没有绝对的优劣。由于项目中使用的是`SIGALRM`信号，这里仅对其进行介绍，另外两种方法可以查阅游双的Linux高性能服务器编程 第11章 定时器。
 
 利用`alarm`函数周期性地触发`SIGALRM`信号，信号处理函数利用**管道**通知主循环，主循环接收到该信号后对升序链表上所有定时器进行处理，若该段时间内没有交换数据，则将该连接关闭，释放所占用的资源。
 
