@@ -1606,6 +1606,79 @@ bool http_conn::write()
 
 相关信号处理API见：[一文搞懂「信号」和「信号集」_海岸星的清风的博客-CSDN博客](https://blog.csdn.net/weixin_42461320/article/details/123443777)
 
+![image-20220706111137372](https://gcore.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202207061111967.png)
+
+![image-20220706111227242](https://gcore.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202207061112913.png)
+
+![image-20220706111257860](https://gcore.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202207061112816.png)
+
+![image-20220706111314346](https://gcore.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202207061113310.png)
+
+**sigaction**
+
+```php
+#include <signal.h>
+int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact);
+    - 功能：检查或者改变信号的处理，即信号捕捉
+    - 参数：
+        - signum : 需要捕捉的信号的编号或者宏值（信号的名称）
+        - act ：捕捉到信号之后的处理动作
+        - oldact : 上一次对信号捕捉相关的设置，一般不使用，传递NULL
+    - 返回值：
+        成功 0
+        失败 -1
+
+ struct sigaction {
+    // 函数指针，指向的函数就是信号捕捉到之后的处理函数
+    void     (*sa_handler)(int);
+    // 不常用，同样是信号处理函数，有三个参数，可以获得关于信号更详细的信息
+    void     (*sa_sigaction)(int, siginfo_t *, void *);
+    // 临时阻塞信号集，在信号捕捉函数执行过程中，临时阻塞某些信号。
+    sigset_t   sa_mask;
+    // 使用哪一个信号处理对捕捉到的信号进行处理
+    int sa_flags;
+    这个值可以是0，表示使用 sa_handler，也可以是 SA_SIGINFO 表示使用 sa_sigaction
+    SA_RESTART，使被信号打断的系统调用自动重新发起
+	SA_NOCLDSTOP，使父进程在它的子进程暂停或继续运行时不会收到 SIGCHLD 信号
+	SA_NOCLDWAIT，使父进程在它的子进程退出时不会收到 SIGCHLD 信号，这时子进程如果退出也不会成为僵尸进程
+	SA_NODEFER，使对信号的屏蔽无效，即在信号处理函数执行期间仍能发出这个信号
+	SA_RESETHAND，信号处理之后重新设置为默认的处理方式
+	SA_SIGINFO，使用 sa_sigaction 成员而不是 sa_handler 作为信号处理函数
+    // 被废弃掉了
+    void     (*sa_restorer)(void);
+};
+```
+
+**alarm**
+
+```php
+#include <unistd.h>
+unsigned int alarm(unsigned int seconds);
+    - 功能：设置定时器（闹钟）。函数调用，开始倒计时，当倒计时为0的时候，函数会给当前的进程发送一个信号：SIGALARM
+    - 参数：
+        seconds: 倒计时的时长，单位：秒。如果参数为0，定时器无效（不进行倒计时，不发信号）。
+                 取消一个定时器，通过 alarm(0)。
+    - 返回值：
+        - 之前没有定时器，返回0
+        - 之前有定时器，返回之前的定时器剩余的时间
+
+- SIGALARM ：默认终止当前的进程，每一个进程都有且只有唯一的一个定时器。
+    alarm(10);  -> 返回0
+    过了1秒
+    alarm(5);   -> 返回9
+
+alarm(100) -> 该函数是不阻塞的
+```
+
+**sigfillset**
+
+```php
+int sigfillset(sigset_t *set);
+    - 功能：将信号集中的所有的标志位置为1
+    - 参数：set：传出参数，需要操作的信号集
+    - 返回值：成功返回0， 失败返回-1
+```
+
 ## 1、信号处理
 
 自定义信号处理函数，创建sigaction结构体变量，设置信号函数。
@@ -1811,8 +1884,6 @@ switch的变量一般为字符或整型，当switch的变量为字符时，case�
 
 **定时任务处理函数**，该函数封装在容器类中，函数遍历升序链表容器，根据超时时间，处理对应的定时器。
 
-**代码分析-使用定时器**，通过代码分析，如何在项目中使用定时器。
-
 项目中将连接资源、定时事件和超时时间封装为定时器类：
 
 - 连接资源包括客户端套接字地址、文件描述符和定时器；
@@ -1878,24 +1949,25 @@ void cb_func(client_data *user_data)
 
 从实现上看，主要涉及双向链表的插入，删除操作，其中添加定时器的事件复杂度是O(n)，删除定时器的事件复杂度是O(1)。
 
-升序双向链表主要逻辑如下，具体的，
+升序双向链表主要逻辑如下：
 
 - 创建头尾节点，其中头尾节点没有意义，仅仅统一方便调整
 
 - add_timer函数，将目标定时器添加到链表中，添加时按照升序添加
 
-- - 若当前链表中只有头尾节点，直接插入
+  - 若当前链表中只有头尾节点，直接插入
   - 否则，将定时器按升序插入
 
 - adjust_timer函数，当定时任务发生变化，调整对应定时器在链表中的位置
 
-- - 客户端在设定时间内有数据收发，则当前时刻对该定时器重新设定时间，这里只是往后延长超时时间
+  - 客户端在设定时间内有数据收发，则当前时刻对该定时器重新设定时间，这里只是往后延长超时时间
   - 被调整的目标定时器在尾部，或定时器新的超时值仍然小于下一个定时器的超时，不用调整
   - 否则先将定时器从链表取出，重新插入链表
 
 - del_timer函数将超时的定时器从链表中删除
 
-- - 常规双向链表删除结点
+  - 常规双向链表删除结点
+
 
 ```php
 //定时器容器类
@@ -2049,10 +2121,12 @@ void sort_timer_lst::add_timer(util_timer *timer, util_timer *lst_head)
 {
     util_timer *prev = lst_head;
     util_timer *tmp = prev->next;
+    
     //从双向链表中找到该定时器应该放置的位置，即遍历一遍双向链表找到对应的位置
+    
     //时间复杂度太高O(n)，这里可以考虑使用C++11的优先队列实现定时器
+    
     //遍历当前结点之后的链表，按照超时时间找到目标定时器对应的位置，常规双向链表插入操作
-
     while (tmp)
     {
         if (timer->expire < tmp->expire)
@@ -2274,7 +2348,8 @@ bool WebServer::dealclinetdata()
 //创建一个定时器节点，将连接信息挂载
 void WebServer::timer(int connfd, struct sockaddr_in client_address)
 {
-    users[connfd].init(connfd, client_address, m_root, m_CONNTrigmode, 							m_close_log, m_user, m_passWord, m_databaseName);
+    users[connfd].init(connfd, client_address, m_root, m_CONNTrigmode,
+                       m_close_log, m_user, m_passWord, m_databaseName);
     //初始化client_data数据
     //创建定时器，设置回调函数和超时时间，绑定用户数据，将定时器添加到链表中
     //初始化该连接对应的连接资源
@@ -2401,7 +2476,7 @@ void WebServer::dealwithread(int sockfd)
         //先读取数据，再放进请求队列
         if (users[sockfd].read_once())
         {
-            LOG_INFO("deal with the client(%s)", 										inet_ntoa(users[sockfd].get_address()->sin_addr));
+            LOG_INFO("deal with the client(%s)", inet_ntoa(users[sockfd].get_address()->sin_addr));
             //将该事件放入请求队列
             m_pool->append_p(users + sockfd);
             if (timer)
@@ -2492,13 +2567,9 @@ void WebServer::dealwithwrite(int sockfd)
 }
 ```
 
-
-
 **有小伙伴问，连接资源中的address是不是有点鸡肋？**
 
-确实如此，项目中虽然对该变量赋值，但并没有用到。类似的，可以对比HTTP类中address属性，只在日志输出中用到。
-
-但不能说这个变量没有用，因为我们可以找到客户端连接的ip地址，用它来做一些业务，比如通过ip来判断是否异地登录等等。
+确实如此，项目中虽然对该变量赋值，但并没有用到。类似的，可以对比HTTP类中address属性，只在日志输出中用到。但不能说这个变量没有用，因为我们可以找到客户端连接的ip地址，用它来做一些业务，比如通过ip来判断是否异地登录等等。
 
 # 四、日志系统
 
