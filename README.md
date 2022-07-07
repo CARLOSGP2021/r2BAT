@@ -1,6 +1,6 @@
 本仓库记录C++技术栈学习就业全过程，点击👉[C++技术栈学习手册 (carlosgp2021.github.io)](https://carlosgp2021.github.io/r2BAT/#/)
 
-<div align=center><img src="https://cdn.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202204140939464.png" alt="image-20220414093917372" style="zoom:70%;" /></div>
+<img src="https://test1.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202204140939464.png" alt="image-20220414093917372" style="zoom:70%;" />
 
 - 你可以在下列这些地方找到我：
   - [Github主页](https://github.com/CARLOSGP2021)
