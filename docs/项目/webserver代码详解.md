@@ -3370,7 +3370,7 @@ void Log::write_log(int level, const char *format, ...)
 
 顾名思义，连接池中的资源为一组数据库连接，由程序动态地对池中的连接进行使用，释放。
 
-当系统开始处理客户请求的时候，如果它需要相关的资源，可以直接从池中获取，无需动态分配；当服务器处理完一个客户连接后,可以把相关的资源放回池中，无需执行系统调用释放资源。
+当系统开始处理客户请求的时候，如果它需要相关的资源，可以直接从池中获取，无需动态分配；当服务器处理完一个客户连接后，可以把相关的资源放回池中，无需执行系统调用释放资源。
 
 **数据库访问的一般流程是什么？**
 
@@ -3378,17 +3378,13 @@ void Log::write_log(int level, const char *format, ...)
 
 **为什么要创建连接池？**
 
-从一般流程中可以看出，若系统需要频繁访问数据库，则需要频繁创建和断开数据库连接，而创建数据库连接是一个很耗时的操作，也容易对数据库造成安全隐患。
-
-在程序初始化的时候，集中创建多个数据库连接，并把他们集中管理，供程序使用，可以保证较快的数据库读写速度，更加安全可靠。
+从一般流程中可以看出，若系统需要频繁访问数据库，则需要频繁创建和断开数据库连接，而创建数据库连接是一个很耗时的操作，也容易对数据库造成安全隐患。在程序初始化的时候，集中创建多个数据库连接，并把他们集中管理，供程序使用，可以保证较快的数据库读写速度，更加安全可靠。
 
 ## 整体概述
 
-池可以看做资源的容器，所以多种实现方法，比如数组、链表、队列等。这里，使用单例模式和链表创建数据库连接池，实现对数据库连接资源的复用。
+池可以看做资源的容器，所以多种实现方法，比如数组、链表、队列等。这里使用**单例模式**和**链表**创建数据库连接池，实现对数据库连接资源的复用。
 
-项目中的数据库模块分为两部分，其一是数据库连接池的定义，其二是利用连接池完成登录和注册的校验功能。具体的，工作线程从数据库连接池取得一个连接，访问数据库中的数据，访问完毕后将连接交还连接池。
-
-## 本文内容
+项目中的数据库模块分为两部分，其一是数据库连接池的定义，其二是利用连接池完成登录和注册的校验功能。工作线程从数据库连接池取得一个连接，访问数据库中的数据，访问完毕后将连接交还连接池。
 
 本篇将介绍数据库连接池的定义，具体的涉及到单例模式创建、连接池代码实现、RAII机制释放数据库连接。
 
@@ -3424,13 +3420,11 @@ connection_pool *connection_pool::GetInstance()
 
 ## 连接池代码实现
 
-连接池的定义中注释比较详细，这里仅对其实现进行解析。
-
 连接池的功能主要有：初始化，获取连接、释放连接，销毁连接池。
 
 ### **初始化**
 
-值得注意的是，销毁连接池没有直接被外部调用，而是通过RAII机制来完成自动释放；使用信号量实现多线程争夺连接的同步机制，这里将信号量初始化为数据库的连接总数。
+值得注意的是，销毁连接池没有直接被外部调用，而是通过RAII机制来完成自动释放；使用**信号量**实现多线程争夺连接的同步机制，这里将信号量初始化为数据库的连接总数。
 
 ```php
 connection_pool::connection_pool()
@@ -3496,24 +3490,17 @@ void connection_pool::init(string url, string User, string PassWord,
 ```php
 //当有请求时，从数据库连接池中返回一个可用连接，更新使用和空闲连接数
 MYSQL *connection_pool::GetConnection()
-
     MYSQL *con = NULL;
-
     if (0 == connList.size())
         return NULL;
-
     //取出连接，信号量原子减1，为0则等待
     reserve.wait();
-
     lock.lock();
-
     con = connList.front();
     connList.pop_front();
-
     //这里的两个变量，并没有用到，非常鸡肋...
     --FreeConn;
     ++CurConn;
-
     lock.unlock();
     return con;
 }
@@ -3523,15 +3510,11 @@ bool connection_pool::ReleaseConnection(MYSQL *con)
 {
     if (NULL == con)
         return false;
-
     lock.lock();
-
     connList.push_back(con);
     ++FreeConn;
     --CurConn;
-
     lock.unlock();
-
     //释放连接原子加1
     reserve.post();
     return true;
@@ -3558,13 +3541,10 @@ void connection_pool::DestroyPool()
         }
         CurConn = 0;
         FreeConn = 0;
-
         //清空list
         connList.clear();
-
         lock.unlock();
     }
-
     lock.unlock();
 }
 ```
@@ -3582,7 +3562,7 @@ class connectionRAII{
 public:
     //双指针对MYSQL *con修改
     connectionRAII(MYSQL **con, connection_pool *connPool);
-    ~connectionRAII);
+    ~connectionRAII();
 
 private:
     MYSQL *conRAII;
@@ -3597,7 +3577,6 @@ private:
 ```php
 connectionRAII::connectionRAII(MYSQL **SQL, connection_pool *connPool){
     *SQL = connPool->GetConnection();
-
     conRAII = *SQL;
     poolRAII = connPool;
 }
@@ -3609,9 +3588,7 @@ connectionRAII::~connectionRAII(){
 
 # 六、注册登录
 
-本项目中，使用数据库连接池实现服务器访问数据库的功能，使用POST请求完成注册和登录的校验工作。
-
-本篇将介绍同步实现注册登录功能，具体的涉及到流程图，载入数据库表，提取用户名和密码，注册登录流程与页面跳转的的代码实现。
+本项目中，使用数据库连接池实现服务器访问数据库的功能，使用POST请求完成注册和登录的校验工作。本篇将介绍同步实现注册登录功能，具体的涉及到流程图，载入数据库表，提取用户名和密码，注册登录流程与页面跳转的的代码实现。
 
 **流程图**，描述服务器从报文中提取出用户名密码，并完成注册和登录校验后，实现页面跳转的逻辑。
 
@@ -3622,8 +3599,6 @@ connectionRAII::~connectionRAII(){
 **注册登录流程**，结合代码对描述服务器进行注册和登录校验的流程。
 
 **页面跳转**，结合代码对页面跳转机制进行详解。
-
-具体的，描述了GET和POST请求下的页面跳转流程。
 
 ![image-20220709153537304](https://test1.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202207091535148.png)
 
@@ -3666,7 +3641,7 @@ void http_conn::initmysql_result(connection_pool *connPool)
 }
 ```
 
-#### **提取用户名和密码**
+### **提取用户名和密码**
 
 服务器端解析浏览器的请求报文，当解析为POST请求时，cgi标志位设置为1，并将请求报文的消息体赋值给m_string，进而提取出用户名和密码。
 
@@ -3677,7 +3652,6 @@ http_conn::HTTP_CODE http_conn::parse_content(char *text)
     if (m_read_idx >= (m_content_length + m_checked_idx))
     {
         text[m_content_length] = '\0';
-
         //POST请求中最后为输入的用户名和密码
         m_string = text;
         return GET_REQUEST;
@@ -3750,7 +3724,6 @@ if (0 == m_SQLVerify)
             int res = mysql_query(mysql, sql_insert);
             users.insert(pair<string, string>(name, password));
             m_lock.unlock();
-
             //校验成功，跳转登录页面
             if (!res)
                 strcpy(m_url, "/log.html");
@@ -3803,7 +3776,6 @@ if (*(p + 1) == '0')
     char *m_url_real = (char *)malloc(sizeof(char) * 200);
     strcpy(m_url_real, "/register.html");
     strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
-
     free(m_url_real);
 }
 
@@ -3813,7 +3785,6 @@ else if (*(p + 1) == '1')
     char *m_url_real = (char *)malloc(sizeof(char) * 200);
     strcpy(m_url_real, "/log.html"); 
     strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
-
     free(m_url_real);
 }
 
@@ -3823,7 +3794,6 @@ else if (*(p + 1) == '5')
     char *m_url_real = (char *)malloc(sizeof(char) * 200);
     strcpy(m_url_real, "/picture.html");
     strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
-
     free(m_url_real);
 }
 
@@ -3833,7 +3803,6 @@ else if (*(p + 1) == '6')
     char *m_url_real = (char *)malloc(sizeof(char) * 200);
     strcpy(m_url_real, "/video.html");
     strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
-
     free(m_url_real);
 }
 
@@ -3843,7 +3812,6 @@ else if (*(p + 1) == '7')
     char *m_url_real = (char *)malloc(sizeof(char) * 200);
     strcpy(m_url_real, "/fans.html");
     strncpy(m_real_file + len, m_url_real, strlen(m_url_real));
-
     free(m_url_real);
 }
 
