@@ -46,6 +46,8 @@
 
 [WebServer服务器项目可能会被问到的问题（二）_笔经面经_牛客网 (nowcoder.com)](https://www.nowcoder.com/discuss/939267)
 
+[如何优雅的介绍自己的项目经历_笔经面经_牛客网 (nowcoder.com)](https://www.nowcoder.com/discuss/150755)
+
 ## 项目亮点
 
 1. 使用 **线程池 + 非阻塞socket + epoll(ET和LT均实现) + 事件处理(Reactor和模拟Proactor均实现)** 的高并发模型；
