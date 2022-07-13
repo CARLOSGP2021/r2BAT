@@ -3400,6 +3400,14 @@ connection_pool *connection_pool::GetInstance()
 
 ## 连接池代码实现
 
+- `mysql_init`
+  - 初始化数据库
+- `mysql_real_connect`
+  - 连接数据库服务器
+  - [PHP mysqli_real_connect() 函数 | 菜鸟教程 (runoob.com)](https://www.runoob.com/php/func-mysqli-real-connect.html)
+- `mysql_close`
+  - 关闭数据库连接
+
 连接池的功能主要有：初始化，获取连接、释放连接，销毁连接池。
 
 ### **初始化**
@@ -3463,9 +3471,7 @@ void connection_pool::init(string url, string User, string PassWord,
 
 ### **获取、释放连接**
 
-当线程数量大于数据库连接数量时，使用信号量进行同步，每次取出连接，信号量原子减1，释放连接原子加1，若连接池内没有连接了，则阻塞等待。
-
-另外，由于多线程操作连接池，会造成竞争，这里使用互斥锁完成同步，具体的同步机制均使用lock.h中封装好的类。
+当线程数量大于数据库连接数量时，使用信号量进行同步，每次取出连接，信号量原子减1，释放连接原子加1，若连接池内没有连接了，则阻塞等待。另外，由于多线程操作连接池，会造成竞争，这里使用互斥锁完成同步，具体的同步机制均使用lock.h中封装好的类。
 
 ```php
 //当有请求时，从数据库连接池中返回一个可用连接，更新使用和空闲连接数
@@ -3582,6 +3588,17 @@ connectionRAII::~connectionRAII(){
 
 ![image-20220709153537304](https://test1.jsdelivr.net/gh/CARLOSGP2021/myFigures/img/202207091535148.png)
 
+- `mysql_query`
+  - 执行一条 MySQL 查询
+- `mysql_store_result`
+  - 本次查询的所有结果都缓存到客户端，对于成功检索了数据的每个查询（SELECT、SHOW、DESCRIBE、EXPLAIN、CHECK TABLE等），必须调用mysql_store_result()或mysql_use_result() 
+- `mysql_num_fields`
+  - 返回结果集中字段（列）的数量
+- `mysql_fetch_fields`
+  - 返回结果集中代表字段（列）的对象的数组
+- `mysql_fetch_row`
+  - 从结果集中取得一行作为数字数组
+
 ### 载入数据库表
 
 将数据库中的用户名和密码载入到服务器的map中来，map中的key为用户名，value为密码。
@@ -3681,7 +3698,6 @@ password[j] = '\0';
 
 ```php
 const char *p = strrchr(m_url, '/');
-
 if (0 == m_SQLVerify)
 {
     if (*(p + 1) == '3')
@@ -3806,7 +3822,7 @@ else
 
 先看下之前的大文件传输，也就是游双书上的代码，发送数据只调用了writev函数，并对其返回值是否异常做了处理。
 
-```
+```php
 bool http_conn::write()
 {
     int temp = 0;
@@ -3867,7 +3883,7 @@ bool http_conn::write()
 
 更新后，大文件传输得到了解决。
 
-```
+```php
 bool http_conn::write()
 {
     int temp = 0;
