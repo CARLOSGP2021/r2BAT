@@ -17,7 +17,6 @@
   - [cpp](八股文/cpp.md)
   - [计网](八股文/计算机网络.md)
   - [OS](八股文/操作系统.md)
-  - [Linux](八股文/Linux.md)
   - [MySQL](八股文/MySQL.md)
 - 项目
   - [服务器](项目/webserver项目.md)
